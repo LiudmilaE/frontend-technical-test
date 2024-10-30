@@ -1,5 +1,5 @@
-import { Box, Text, useDimensions } from "@chakra-ui/react";
-import { useMemo, useRef } from "react";
+import { Box, Text, /*useDimensions*/ } from "@chakra-ui/react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 export type MemePictureProps = {
   pictureUrl: string;
@@ -21,8 +21,12 @@ export const MemePicture: React.FC<MemePictureProps> = ({
   dataTestId = '',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const dimensions = useDimensions(containerRef, true);
-  const boxWidth = dimensions?.borderBox.width;
+  const [boxWidth, setBoxWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const rectClient = containerRef.current?.getBoundingClientRect();
+    setBoxWidth(rectClient?.width ?? 0);
+  }, [containerRef?.current])
 
   const { height, fontSize, texts } = useMemo(() => {
     if (!boxWidth) {
