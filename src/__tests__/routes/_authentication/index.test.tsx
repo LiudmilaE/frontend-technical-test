@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, fireEvent } from "@testing-library/react";
 import { ChakraProvider } from "@chakra-ui/react";
 import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
 import { AuthenticationContext } from "../../../contexts/authentication";
@@ -74,6 +74,30 @@ describe("routes/_authentication/index", () => {
         expect(screen.getByTestId("meme-comment-content-dummy_meme_id_1-dummy_comment_id_3")).toHaveTextContent('dummy comment 3');
         expect(screen.getByTestId("meme-comment-author-dummy_meme_id_1-dummy_comment_id_3")).toHaveTextContent('dummy_user_3');
       });
+    });
+
+    it("should trigger handleSubmit on add-comment-form's' submit and clean input value", async () => {
+      renderMemeFeedPage();
+
+      await waitFor(() => {
+        // We check that the right number of comments is displayed
+        expect(screen.getByTestId("meme-comments-count-dummy_meme_id_1")).toHaveTextContent('3 comments');
+        
+        // We check that the right comments with the right authors are displayed
+        expect(screen.getByTestId("meme-comment-content-dummy_meme_id_1-dummy_comment_id_1")).toHaveTextContent('dummy comment 1');
+      });
+
+      // form input for comment is available and has an empty string as value
+      expect(screen.getByPlaceholderText('Type your comment here...')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Type your comment here...')).toHaveDisplayValue("");
+      
+      // input value is changed successfully
+      fireEvent.change(screen.getByPlaceholderText('Type your comment here...'), {target: {value: 'lorem ipsum'}});
+      expect(screen.getByPlaceholderText('Type your comment here...')).toHaveDisplayValue("lorem ipsum");
+      
+      // form is submitted and value is changed to empty string again
+      fireEvent.submit(screen.getByTestId("add-comment-form-dummy_meme_id_1"));
+      expect(screen.getByPlaceholderText('Type your comment here...')).toHaveDisplayValue("");
     });
   });
 });

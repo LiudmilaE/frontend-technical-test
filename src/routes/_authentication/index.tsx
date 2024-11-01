@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Avatar,
@@ -11,12 +11,11 @@ import {
   LinkOverlay,
   StackDivider,
   Text,
-  Input,
   VStack,
 } from "@chakra-ui/react";
 import { CaretDown, CaretUp, Chat } from "@phosphor-icons/react";
 import { format } from "timeago.js";
-import { createMemeComment, getUserById } from "../../api";
+import { getUserById } from "../../api";
 import { useMemes } from "../../services/queries";
 import { useAuthToken } from "../../contexts/authentication";
 import { Loader } from "../../components/loader";
@@ -24,11 +23,11 @@ import { MemePicture } from "../../components/meme-picture";
 import { Fragment, useState } from "react";
 import { jwtDecode } from "jwt-decode";
 import { CommentsList } from "../../components/comments-list";
+import { AddCommentForm } from "../../components/add-comment-form";
 
 export const MemeFeedPage: React.FC = () => {
   const token = useAuthToken();
   const memesQuery = useMemes(token);
-  const { isLoading } = memesQuery;
 
   const { data: user } = useQuery({
     queryKey: ["user"],
@@ -39,16 +38,8 @@ export const MemeFeedPage: React.FC = () => {
   const [openedCommentSection, setOpenedCommentSection] = useState<
     string | null
   >(null);
-  const [commentContent, setCommentContent] = useState<{
-    [key: string]: string;
-  }>({});
-  const { mutate } = useMutation({
-    mutationFn: async (data: { memeId: string; content: string }) => {
-      await createMemeComment(token, data.memeId, data.content);
-    },
-  });
 
-  if (isLoading && !memesQuery.data) {
+  if (memesQuery.isLoading && !memesQuery.data) {
     return <Loader data-testid="meme-feed-loader" />;
   }
   return (
@@ -139,38 +130,11 @@ export const MemeFeedPage: React.FC = () => {
                     animateOpacity
                   >
                     <Box mb={6}>
-                      <form
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          if (commentContent[meme.id]) {
-                            mutate({
-                              memeId: meme.id,
-                              content: commentContent[meme.id],
-                            });
-                          }
-                        }}
-                      >
-                        <Flex alignItems="center">
-                          <Avatar
-                            borderWidth="1px"
-                            borderColor="gray.300"
-                            name={user?.username}
-                            src={user?.pictureUrl}
-                            size="sm"
-                            mr={2}
-                          />
-                          <Input
-                            placeholder="Type your comment here..."
-                            onChange={(event) => {
-                              setCommentContent({
-                                ...commentContent,
-                                [meme.id]: event.target.value,
-                              });
-                            }}
-                            value={commentContent[meme.id]}
-                          />
-                        </Flex>
-                      </form>
+                      <AddCommentForm
+                        memeId={meme.id}
+                        username={user?.username}
+                        pictureUrl={user?.pictureUrl}
+                      />
                     </Box>
                     {Number(meme.commentsCount) !== 0 && (
                       <CommentsList memeId={meme.id} />
