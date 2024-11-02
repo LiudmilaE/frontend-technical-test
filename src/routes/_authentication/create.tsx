@@ -10,11 +10,15 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { MemeEditor } from "../../components/meme-editor";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { MemePictureProps } from "../../components/meme-picture";
 import { Plus, Trash } from "@phosphor-icons/react";
+import { v4 as uuidv4 } from 'uuid';
+
+import { MemeEditor } from "../../components/meme-editor";
+import { createMeme } from "../../api";
+import { useAuthToken } from "../../contexts/authentication";
+
 
 export const Route = createFileRoute("/_authentication/create")({
   component: CreateMemePage,
@@ -27,7 +31,15 @@ type Picture = {
 
 function CreateMemePage() {
   const [picture, setPicture] = useState<Picture | null>(null);
-  const [texts, setTexts] = useState<MemePictureProps["texts"]>([]);
+  const [description, setDescription] = useState("");
+  const [texts, setTexts] = useState<{
+    id: string;
+    content: string;
+    x: number;
+    y: number;
+  }[]>([]);
+  const token = useAuthToken();
+  const navigate = useNavigate();
 
   const handleDrop = (file: File) => {
     setPicture({
@@ -37,18 +49,29 @@ function CreateMemePage() {
   };
 
   const handleAddCaptionButtonClick = () => {
-    setTexts([
-      ...texts,
-      {
-        content: `New caption ${texts.length + 1}`,
-        x: Math.random() * 400,
-        y: Math.random() * 225,
-      },
-    ]);
+    setTexts(oldData => {
+      return (oldData.concat({
+        id: uuidv4(),
+        content: `New caption ${oldData.length + 1}`,
+        x: Math.trunc(Math.random() * 400),
+        y: Math.trunc(Math.random() * 225),
+      })
+    )});
   };
 
-  const handleDeleteCaptionButtonClick = (index: number) => {
-    setTexts(texts.filter((_, i) => i !== index));
+  const handleDeleteCaptionButtonClick = (id: string) => {
+    setTexts(texts.filter((text) => text.id !== id));
+  };
+
+  const handleChangeDescription = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setDescription(event.target.value);
+  };
+
+  const handleChangeCaption = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { value, name } = event.target;
+    setTexts(oldData => ([
+      ...oldData.map(text => text.id !== name? text : ({...text, content: value}))
+    ]));
   };
 
   const memePicture = useMemo(() => {
@@ -61,6 +84,23 @@ function CreateMemePage() {
       texts,
     };
   }, [picture, texts]);
+
+  const handleSubmit = () => {
+    const formData = new FormData();
+    if (picture?.file) {
+      formData.append('picture', picture.file);
+    }
+    formData.append('description', description);
+    texts.forEach((text, index) => {
+      Object.entries(text).filter(([key,]) => key !== "id").forEach(([name, value]) => {
+        formData.append(`Texts[${index}][${name}]`, value.toString());
+      });
+    })
+
+    createMeme(token, formData).then(() => {
+      navigate({ to: "/" });
+    });
+  }
 
   return (
     <Flex width="full" height="full">
@@ -76,7 +116,7 @@ function CreateMemePage() {
             <Heading as="h2" size="md" mb={2}>
               Describe your meme
             </Heading>
-            <Textarea placeholder="Type your description here..." />
+            <Textarea placeholder="Type your description here..." required value={description} onChange={handleChangeDescription}/>
           </Box>
         </VStack>
       </Box>
@@ -92,11 +132,11 @@ function CreateMemePage() {
         </Heading>
         <Box p={4} flexGrow={1} height={0} overflowY="auto">
           <VStack>
-            {texts.map((text, index) => (
-              <Flex width="full">
-                <Input key={index} value={text.content} mr={1} />
+            {texts.map((text) => (
+              <Flex width="full" key={text.id}>
+                <Input name={text.id} value={text.content ?? ""} mr={1} onChange={handleChangeCaption}/>
                 <IconButton
-                  onClick={() => handleDeleteCaptionButtonClick(index)}
+                  onClick={() => handleDeleteCaptionButtonClick(text.id)}
                   aria-label="Delete caption"
                   icon={<Icon as={Trash} />}
                 />
@@ -131,7 +171,8 @@ function CreateMemePage() {
             size="sm"
             width="full"
             color="white"
-            isDisabled={memePicture === undefined}
+            isDisabled={!description || memePicture === undefined}
+            onClick={handleSubmit}
           >
             Submit
           </Button>
